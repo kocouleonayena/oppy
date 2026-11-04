@@ -53,7 +53,7 @@ export async function callGemini(opts: {
       // Ne jamais journaliser des messages du fournisseur contenant
       // potentiellement des informations personnelles du document.
       const message = err instanceof Error ? err.message : String(err);
-      const temporary = /(?:\\b503\\b|\\b429\\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded)/i.test(message);
+      const temporary = /(?:503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded)/i.test(message);
       if (temporary && attempt === 0) {
         await new Promise(resolve => setTimeout(resolve, 1500));
         continue;
