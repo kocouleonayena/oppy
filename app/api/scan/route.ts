@@ -1,3 +1,4 @@
+import { callOpenAIFallback } from "@/lib/openaiFallback";
 import { reserveFreeAnalysis } from "@/lib/freeAnalysis";
 import { analysisUnavailable, pilotAnalysisEnabled } from "@/lib/pilotAccess";
 import { NextResponse } from "next/server";
@@ -71,10 +72,12 @@ export async function POST(request: Request) {
   // 1. Lecture et validation des entrées. L'annonce est optionnelle.
   let cv: string;
   let annonce: string | undefined;
+  let aiProvidersConsent = false;
   try {
     const body = await request.json();
     cv = typeof body?.cv === "string" ? body.cv.trim() : "";
     annonce = typeof body?.annonce === "string" ? body.annonce.trim() : "";
+    aiProvidersConsent = body?.aiProvidersConsent === true;
   } catch {
     return NextResponse.json({ error: "Corps de requête invalide." }, { status: 400 });
   }
@@ -85,51 +88,67 @@ export async function POST(request: Request) {
 
   if (cv.length > 30000 || (annonce?.length ?? 0) > 20000) return NextResponse.json({ error: "Document trop long." }, { status: 413 });
 
+  if (!aiProvidersConsent) {
+    return NextResponse.json(
+      { error: "Accepte le traitement du CV et de l'offre par Gemini et, si nécessaire, OpenAI pour lancer l'analyse." },
+      { status: 400 }
+    );
+  }
+
   // Réservation atomique avant l'appel coûteux au modèle.
   // En phase pilote, seul le diagnostic gratuit est autorisé.
   const reservation = await reserveFreeAnalysis(request);
   if (!reservation.ok) return NextResponse.json({error: reservation.error}, {status: reservation.status, headers: {"Cache-Control": "no-store"}});
 
-  // 2. Appel à Gemini. Aucune donnée n'est stockée.
-  const res = await callGemini({
-    model: MODEL,
-    system: SCAN_SYSTEM_PROMPT,
-    user: buildScanUserPrompt(cv, annonce),
+  // Gemini reste prioritaire ; OpenAI n'est appelé qu'avec l'accord de l'utilisateur.
+  const system = SCAN_SYSTEM_PROMPT;
+  const user = buildScanUserPrompt(cv, annonce);
+  const primary = await callGemini({
+    model: MODEL, system, user,
     maxOutputTokens: MAX_TOKENS,
     temperature: TEMPERATURE,
   });
 
-  if (!res.ok) {
-    await reservation.release();
-    if (res.reason === "no-key") {
+  let reportText = "";
+  let provider: "gemini" | "openai" = "gemini";
+
+  if (primary.ok) {
+    reportText = primary.text;
+  } else {
+    const fallbackAllowed = ["unavailable", "error", "empty", "no-key"].includes(primary.reason);
+    if (fallbackAllowed) {
+      const backup = await callOpenAIFallback({ system, user });
+      if (backup.ok) {
+        reportText = backup.text;
+        provider = "openai";
+      } else {
+        await reservation.release();
+        // Les documents et les réponses brutes ne sont jamais journalisés.
+        console.error("OPPY AI unavailable", {
+          primary: primary.reason,
+          fallback: backup.reason,
+        });
+        const message = backup.reason === "not-configured"
+          ? "Gemini est indisponible et le secours OpenAI n'est pas encore configuré."
+          : "Les services d'IA sont momentanément indisponibles. Ton analyse gratuite n'a pas été décomptée.";
+        return NextResponse.json({ error: message }, {
+          status: 503,
+          headers: { "Cache-Control": "no-store", "Retry-After": "60" },
+        });
+      }
+    } else {
+      await reservation.release();
       return NextResponse.json(
-        { error: "Clé API manquante. Définis GEMINI_API_KEY dans .env.local." },
-        { status: 500 }
+        { error: "L'analyse n'a pas abouti. Ton essai gratuit n'a pas été décompté." },
+        { status: 502, headers: { "Cache-Control": "no-store" } }
       );
     }
-    if (res.reason === "truncated") {
-      return NextResponse.json(
-        { error: "Le CV est trop long pour être analysé en une fois. Raccourcis-le et réessaie." },
-        { status: 502 }
-      );
-    }
-    if (res.reason === "unavailable") {
-      return NextResponse.json(
-        { error: "Le service d'IA est temporairement surchargé. Ton analyse gratuite n'a pas été consommée. Réessaie un peu plus tard." },
-        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } }
-      );
-    }
-    console.error("Erreur /api/scan:", res.reason);
-    return NextResponse.json(
-      { error: "Le scan a échoué. Réessaie dans un instant." },
-      { status: 502 }
-    );
   }
 
   // 3. Parse + validation du JSON structuré.
   let result: ScanResult;
   try {
-    result = normalize(parseLenientJson(res.text));
+    result = normalize(parseLenientJson(reportText));
   } catch {
     await reservation.release();
     console.error("Scan : format JSON invalide reçu du modèle.");
@@ -139,5 +158,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ result }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ result, provider }, { headers: { "Cache-Control": "no-store" } });
 }
