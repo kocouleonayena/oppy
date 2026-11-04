@@ -36,7 +36,7 @@ export default function Home() {
   const busy = loading || scanLoading || importing;
   // OPPY compare obligatoirement le CV à une opportunité.
   const canOptimize = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
-  const canScan = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
+  const canScan = cv.trim().length >= 50 && annonce.trim().length >= 50 && !busy;
 
   async function handleOptimize() {
     setLoading(true);
@@ -256,18 +256,18 @@ export default function Home() {
             id="annonce"
             value={annonce}
             onChange={(e) => setAnnonce(e.target.value)}
-            placeholder="Colle ici le texte de l'annonce ciblée…"
+            placeholder="Colle le texte de l'annonce (les liens seront pris en charge prochainement)…"
             rows={16}
           />
         </div>
       </section>
 
       <div className="actions">
-        <button onClick={handleOptimize} disabled={!canOptimize} className="primary">
-          {loading ? "Optimisation en cours…" : "Prévisualiser le CV amélioré"}
+        <button onClick={handleOptimize} disabled={true} className="primary" title="À venir après l’activation des achats">
+          {"Aperçu du CV amélioré — prochainement"}
         </button>
         <button onClick={handleScan} disabled={!canScan} className="primary secondary-action">
-          {scanLoading ? "Scan en cours…" : "Analyser ma candidature"}
+          {scanLoading ? "Analyse en cours…" : "Lancer ma première analyse gratuite"}
         </button>
       </div>
 
@@ -329,7 +329,7 @@ export default function Home() {
         </section>
       )}
 
-      <p className="oppy-warning">Prototype technique : les cinq scores OPPY, l’accès par URL, le quota gratuit et les paiements FedaPay ne sont pas encore intégrés. Ne pas ouvrir au public.</p>
+      <p className="oppy-warning">Pilote privé : l’analyse IA reste désactivée jusqu’à la configuration sécurisée du quota. Une seule analyse gratuite est prévue par connexion réseau sur 180 jours, ce qui peut affecter les réseaux partagés. Les paiements, les offres par URL et la réécriture du CV seront disponibles ultérieurement. Utilise des CV fictifs ou anonymisés pour les tests.</p>
       <AtsGuide />
     </main>
   );
