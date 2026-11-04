@@ -12,7 +12,7 @@ export type ScanResult = {
   questions: string[];
   avertissement: string;
 };
-export const MODEL = "gemini-3.8-flash";
+export const MODEL = "gemini-3.5-flash-lite";
 export const TEMPERATURE = 0.2;
 export const MAX_TOKENS = 6000;
 
