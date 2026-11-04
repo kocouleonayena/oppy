@@ -10,8 +10,8 @@ export async function reserveFreeAnalysis(request: Request): Promise<
   | { ok: true }
   | { ok: false; status: number; error: string }
 > {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   const pepper = process.env.OPPY_QUOTA_SECRET;
   if (!url || !token || !pepper || pepper.length < 24) {
     return { ok: false, status: 503, error: "Le quota de la version pilote n'est pas encore configuré." };
