@@ -83,10 +83,18 @@ export default function Home() {
         body: JSON.stringify({ cv, annonce, aiProvidersConsent }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data?.error ?? "Une erreur est survenue.");
+        if (res.status === 504 || res.status === 502) {
+          setError("L'analyse a dépassé le délai du serveur ou le fournisseur d'IA n'a pas répondu. Essaie à nouveau sans réimporter le CV.");
+        } else {
+          setError(data?.error ?? "Le service d'analyse est temporairement indisponible.");
+        }
+        return;
+      }
+      if (!data?.result) {
+        setError("Le serveur n'a pas renvoyé de rapport exploitable.");
         return;
       }
 
