@@ -124,14 +124,24 @@ export async function POST(request: Request) {
       } else {
         await reservation.release();
         // Les documents et les réponses brutes ne sont jamais journalisés.
-        console.error("OPPY AI unavailable", {
-          primary: primary.reason,
-          fallback: backup.reason,
+        console.error("OPPY AI providers failed", {
+          gemini: primary.reason,
+          openai: backup.reason,
+          openaiHttpStatus: backup.status ?? null,
+          openaiErrorCode: backup.code ?? null,
         });
-        const message = backup.reason === "not-configured"
-          ? "Gemini est indisponible et le secours OpenAI n'est pas encore configuré."
-          : "Les services d'IA sont momentanément indisponibles. Ton analyse gratuite n'a pas été décomptée.";
-        return NextResponse.json({ error: message }, {
+        const messages: Record<string, string> = {
+          "not-configured": "La clé OpenAI n'est pas configurée dans cet environnement de test.",
+          "unauthorized": "La clé OpenAI a été refusée ou le projet n'est pas autorisé à utiliser l'API. Vérifie la clé et ses autorisations dans OpenAI Platform.",
+          "credits": "Le compte API OpenAI n'a plus de crédits disponibles ou a atteint sa limite de dépenses. Vérifie la facturation et les plafonds du projet OpenAI.",
+          "rate-limited": "OpenAI limite temporairement les requêtes. Réessaie plus tard ou vérifie les limites API du projet.",
+          "timeout": "Gemini est indisponible et OpenAI n'a pas répondu dans le délai imparti. Ton analyse gratuite reste disponible.",
+          "invalid": "OpenAI a rejeté la demande d'analyse. La configuration de l'API doit être corrigée avant un nouvel essai.",
+          "unavailable": "Gemini et OpenAI sont temporairement indisponibles. Ton analyse gratuite reste disponible.",
+        };
+        return NextResponse.json({
+          error: messages[backup.reason] ?? messages.unavailable,
+        }, {
           status: 503,
           headers: { "Cache-Control": "no-store", "Retry-After": "60" },
         });
