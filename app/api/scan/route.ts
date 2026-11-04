@@ -113,7 +113,13 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-    console.error("Erreur /api/scan:", res.reason, typeof res.detail === "string" ? res.detail.slice(0, 600) : "");
+    if (res.reason === "unavailable") {
+      return NextResponse.json(
+        { error: "Le service d'IA est temporairement surchargé. Ton analyse gratuite n'a pas été consommée. Réessaie un peu plus tard." },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } }
+      );
+    }
+    console.error("Erreur /api/scan:", res.reason);
     return NextResponse.json(
       { error: "Le scan a échoué. Réessaie dans un instant." },
       { status: 502 }
