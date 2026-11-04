@@ -208,7 +208,7 @@ export default function Home() {
   return (
     <main className="container">
       <header className="header">
-        <p className="oppy-label">UN PRODUIT OARAXOOM · VERSION DE DÉVELOPPEMENT</p>
+        <p className="oppy-label">UN PRODUIT ORAXOOM · VERSION DE DÉVELOPPEMENT</p>
         <h1>oppy</h1>
         <h2 className="oppy-headline">Ton potentiel mérite la bonne opportunité.</h2>
         <p className="subtitle">
