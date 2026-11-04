@@ -12,11 +12,11 @@
  * ----------------------------------------------------------------------------
  */
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 export type GeminiResult =
   | { ok: true; text: string }
-  | { ok: false; reason: "no-key" | "empty" | "truncated" | "error"; detail?: string };
+  | { ok: false; reason: "no-key" | "empty" | "truncated" | "unavailable" | "error"; detail?: string };
 
 export async function callGemini(opts: {
   model: string;
@@ -28,40 +28,56 @@ export async function callGemini(opts: {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { ok: false, reason: "no-key" };
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey });
+  // Un temps plafond total empêche Gemini d'occuper les 60 s disponibles
+  // sur Vercel avant que le secours OpenAI puisse prendre le relais.
+  const deadline = Date.now() + 17000;
 
-    const response = await ai.models.generateContent({
-      model: opts.model,
-      contents: opts.user,
-      config: {
-        systemInstruction: opts.system,
-        // Force une sortie JSON pure (pas de blocs Markdown autour).
-        responseMimeType: "application/json",
-        maxOutputTokens: opts.maxOutputTokens,
-        temperature: opts.temperature,
-        // IMPORTANT : Gemini 2.5 « réfléchit » par défaut, et ces tokens de
-        // réflexion consomment le budget de sortie — au risque de renvoyer une
-        // réponse vide. Pour une extraction structurée comme la nôtre, on
-        // désactive le thinking : plus rapide, plus fiable, moins de quota.
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 3000) return { ok: false, reason: "unavailable" };
 
-    const finish = response.candidates?.[0]?.finishReason;
-    const text = (response.text ?? "").trim();
-
-    // Coupé par la limite de tokens → JSON incomplet, inutilisable.
-    if (finish === "MAX_TOKENS") return { ok: false, reason: "truncated" };
-
-    if (!text) return { ok: false, reason: "empty", detail: String(finish ?? "") };
-
-    return { ok: true, text };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: "error",
-      detail: err instanceof Error ? err.message : "inconnue",
-    };
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const request = ai.models.generateContent({
+        model: opts.model,
+        contents: opts.user,
+        config: {
+          systemInstruction: opts.system,
+          responseMimeType: "application/json",
+          maxOutputTokens: opts.maxOutputTokens,
+          temperature: opts.temperature,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          httpOptions: { timeout: Math.max(1000, remaining - 500) },
+        },
+      });
+      // Second garde-fou si le SDK ignore la limite réseau : libère le
+      // traitement côté OPPY et permet le secours avant la fin de fonction.
+      const response = await Promise.race([
+        request,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("Gemini gateway deadline exceeded")),
+            Math.max(1000, remaining)
+          );
+        }),
+      ]);
+      const finish = response.candidates?.[0]?.finishReason;
+      const text = (response.text ?? "").trim();
+      if (finish === "MAX_TOKENS") return { ok: false, reason: "truncated" };
+      if (!text) return { ok: false, reason: "empty" };
+      return { ok: true, text };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const temporary = /(?:503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|timeout|deadline|abort)/i.test(message);
+      if (temporary && attempt === 0 && deadline - Date.now() > 4000) {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        continue;
+      }
+      return { ok: false, reason: temporary ? "unavailable" : "error" };
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
+  return { ok: false, reason: "unavailable" };
 }

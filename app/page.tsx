@@ -19,6 +19,8 @@ export default function Home() {
   const [annonce, setAnnonce] = useState("");
   const [result, setResult] = useState<CvContent | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [aiProvidersConsent, setAiProvidersConsent] = useState(false);
+  const [usedProvider, setUsedProvider] = useState<"gemini" | "openai" | null>(null);
   const [loading, setLoading] = useState(false); // optimisation
   const [scanLoading, setScanLoading] = useState(false); // scan
   const [importing, setImporting] = useState(false); // import de fichier
@@ -34,9 +36,9 @@ export default function Home() {
   const resultText = result ? cvContentToText(result) : "";
 
   const busy = loading || scanLoading || importing;
-  // Optimiser exige le CV ET l'annonce ; Scanner n'exige que le CV.
+  // OPPY compare obligatoirement le CV à une opportunité.
   const canOptimize = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
-  const canScan = cv.trim().length > 0 && !busy;
+  const canScan = cv.trim().length >= 50 && annonce.trim().length >= 50 && aiProvidersConsent && !busy;
 
   async function handleOptimize() {
     setLoading(true);
@@ -72,22 +74,32 @@ export default function Home() {
     setError("");
     setScanResult(null);
     setResult(null);
+    setUsedProvider(null);
 
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cv, annonce }),
+        body: JSON.stringify({ cv, annonce, aiProvidersConsent }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data?.error ?? "Une erreur est survenue.");
+        if (res.status === 504 || res.status === 502) {
+          setError("L'analyse a dépassé le délai du serveur ou le fournisseur d'IA n'a pas répondu. Essaie à nouveau sans réimporter le CV.");
+        } else {
+          setError(data?.error ?? "Le service d'analyse est temporairement indisponible.");
+        }
+        return;
+      }
+      if (!data?.result) {
+        setError("Le serveur n'a pas renvoyé de rapport exploitable.");
         return;
       }
 
       setScanResult(data.result ?? null);
+      setUsedProvider(data.provider === "openai" ? "openai" : "gemini");
     } catch {
       setError("Impossible de contacter le serveur. Réessaie.");
     } finally {
@@ -120,7 +132,7 @@ export default function Home() {
       // On remplit la zone CV : l'utilisateur peut relire/corriger ensuite.
       setCv(data.text ?? "");
       setNotice(
-        `Texte importé depuis « ${file.name} ». Relis-le et corrige si besoin avant d'optimiser ou scanner.`
+        `Texte importé depuis « ${file.name} ». Relis-le et corrige-le si nécessaire avant de lancer l'analyse.`
       );
     } catch {
       setError("Impossible de contacter le serveur pour l'import. Réessaie.");
@@ -208,12 +220,13 @@ export default function Home() {
   return (
     <main className="container">
       <header className="header">
-        <h1>CV-ATS</h1>
+        <p className="oppy-label">UN PRODUIT ORAXOOM · VERSION DE DÉVELOPPEMENT</p>
+        <h1>oppy</h1>
+        <h2 className="oppy-headline">Ton potentiel mérite la bonne opportunité.</h2>
         <p className="subtitle">
-          Colle ton CV et l&apos;annonce visée. <strong>Optimiser</strong> réécrit
-          ton CV en version ATS ; <strong>Scanner</strong> diagnostique sa
-          compatibilité (l&apos;annonce est alors optionnelle). Aucune donnée
-          n&apos;est stockée.
+          Importe ton CV en PDF ou Word, puis colle le texte de l&apos;offre visée.
+          Vérifie tes informations avant de lancer l&apos;analyse. OPPY t&apos;aide
+          à mieux présenter ton parcours, sans inventer tes expériences.
         </p>
       </header>
 
@@ -241,7 +254,7 @@ export default function Home() {
             id="cv"
             value={cv}
             onChange={(e) => setCv(e.target.value)}
-            placeholder="Colle ici le texte de ton CV, ou importe un .pdf / .docx…"
+            placeholder="Importe un fichier PDF ou Word. Tu pourras ici vérifier et corriger les informations extraites."
             rows={16}
           />
           {notice && <p className="notice">{notice}</p>}
@@ -249,37 +262,49 @@ export default function Home() {
 
         <div className="field">
           <label htmlFor="annonce">
-            L&apos;annonce d&apos;emploi{" "}
-            <span className="label-hint">(optionnelle pour le scan)</span>
+            Le texte de l&apos;opportunité
           </label>
           <textarea
             id="annonce"
             value={annonce}
             onChange={(e) => setAnnonce(e.target.value)}
-            placeholder="Colle ici le texte de l'annonce ciblée…"
+            placeholder="Colle le texte de l'annonce (les liens seront pris en charge prochainement)…"
             rows={16}
           />
         </div>
       </section>
 
+      <div className="oppy-consent">
+        <label>
+          <input
+            type="checkbox"
+            checked={aiProvidersConsent}
+            onChange={e => setAiProvidersConsent(e.target.checked)}
+            disabled={busy}
+          />
+          <span>J'accepte que les informations de mon CV et de l'offre soient transmises à Google Gemini pour l'analyse et, seulement en cas d'indisponibilité, à OpenAI pour assurer le service.</span>
+        </label>
+        <p>Ces prestataires traitent les données selon leurs conditions. Pour ce pilote, utilise uniquement un CV fictif ou anonymisé.</p>
+      </div>
+
       <div className="actions">
-        <button onClick={handleOptimize} disabled={!canOptimize} className="primary">
-          {loading ? "Optimisation en cours…" : "Optimiser"}
+        <button onClick={handleOptimize} disabled={true} className="primary" title="À venir après l’activation des achats">
+          {"Aperçu du CV amélioré — prochainement"}
         </button>
         <button onClick={handleScan} disabled={!canScan} className="primary secondary-action">
-          {scanLoading ? "Scan en cours…" : "Scanner mon CV"}
+          {scanLoading ? "Analyse en cours…" : "Lancer ma première analyse gratuite"}
         </button>
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      {scanResult && <ScanReport data={scanResult} />}
+      {scanResult && <><p className="oppy-provider">Analyse réalisée par {usedProvider === "openai" ? "OpenAI (solution de secours)" : "Gemini"}.</p><ScanReport data={scanResult} /></>}
 
       {result && (
         <section className="field result-block">
           <div className="result-head">
             <label htmlFor="result">Résultat optimisé</label>
-            <button onClick={handleCopy} className="secondary">
+            <button onClick={handleCopy} className="secondary" disabled title="Copie indisponible pendant la phase de configuration">
               {copied ? "Copié ✓" : "Copier"}
             </button>
           </div>
@@ -313,22 +338,23 @@ export default function Home() {
           <div className="result-actions">
             <button
               onClick={handleDownloadDocx}
-              disabled={!result || downloading}
+              disabled={true}
               className="primary secondary-action"
             >
-              {downloading ? "Génération…" : "Télécharger en .docx"}
+              {downloading ? "Génération…" : "Export Word bientôt disponible — 500 FCFA"}
             </button>
             <button
               onClick={handleDownloadPdf}
-              disabled={!result || downloadingPdf}
+              disabled={true}
               className="primary"
             >
-              {downloadingPdf ? "Génération…" : "Télécharger ce style (PDF)"}
+              {downloadingPdf ? "Génération…" : "Export PDF bientôt disponible — 500 FCFA"}
             </button>
           </div>
         </section>
       )}
 
+      <p className="oppy-warning">Pilote privé : la première analyse gratuite est activée dans cet environnement de test. Une seule analyse est prévue par connexion réseau sur 180 jours, ce qui peut affecter les réseaux partagés. En cas d'indisponibilité de l'IA, l'analyse n'est pas décomptée. Utilise uniquement des CV fictifs ou anonymisés ; les paiements et l'analyse des offres par URL sont encore en préparation.</p>
       <AtsGuide />
     </main>
   );

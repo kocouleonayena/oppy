@@ -1,109 +1,40 @@
-/**
- * ============================================================================
- *  AFFICHAGE DU DIAGNOSTIC ATS (résultat du bouton « Scanner mon CV »)
- * ============================================================================
- *
- * Composant purement présentationnel : il reçoit un `ScanResult` (la forme
- * définie dans lib/scanPrompt.ts) et l'affiche de façon lisible.
- *   - score bien visible, coloré selon le niveau (rouge / orange / vert)
- *   - puis chaque section (points forts, problèmes, mots-clés, recommandations)
- *
- * Les styles vivent dans app/globals.css (classes .scan-*).
- * ----------------------------------------------------------------------------
- */
+import type { ScanResult, DimensionKey } from "@/lib/scanPrompt";
 
-import type { ScanResult } from "@/lib/scanPrompt";
+const items: {key: DimensionKey; label: string}[] = [
+ {key:"adequation",label:"Adéquation à l'offre"},
+ {key:"competences",label:"Compétences"},
+ {key:"experiences",label:"Expériences"},
+ {key:"presentation",label:"Présentation"},
+ {key:"valorisation",label:"Valorisation du parcours"},
+];
 
-/** Niveau visuel du score → couleur. <50 rouge, <75 orange, sinon vert. */
-function scoreLevel(score: number): "low" | "mid" | "high" {
-  if (score < 50) return "low";
-  if (score < 75) return "mid";
-  return "high";
-}
-
-/** Libellé lisible du niveau global. */
-function scoreLabel(score: number): string {
-  if (score < 50) return "Compatibilité faible";
-  if (score < 75) return "Compatibilité moyenne";
-  return "Bonne compatibilité";
-}
-
-export default function ScanReport({ data }: { data: ScanResult }) {
-  const level = scoreLevel(data.score);
-
-  return (
-    <section className="scan-report">
-      {/* --- Score --- */}
-      <div className={`scan-score scan-score--${level}`}>
-        <div className="scan-score-number">
-          {data.score}
-          <span className="scan-score-max">/100</span>
-        </div>
-        <div className="scan-score-label">{scoreLabel(data.score)}</div>
-      </div>
-
-      {/* --- Points forts --- */}
-      {data.pointsForts.length > 0 && (
-        <div className="scan-block">
-          <h3 className="scan-block-title">Points forts</h3>
-          <ul className="scan-list">
-            {data.pointsForts.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* --- Problèmes (avec badge de gravité) --- */}
-      {data.problemes.length > 0 && (
-        <div className="scan-block">
-          <h3 className="scan-block-title">Problèmes détectés</h3>
-          <ul className="scan-list scan-list--problems">
-            {data.problemes.map((p, i) => (
-              <li key={i}>
-                <span
-                  className={`scan-badge scan-badge--${
-                    p.severite === "élevée"
-                      ? "high"
-                      : p.severite === "moyenne"
-                      ? "mid"
-                      : "low"
-                  }`}
-                >
-                  {p.severite}
-                </span>
-                <span>{p.texte}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* --- Mots-clés manquants (seulement si une annonce était fournie) --- */}
-      {data.motsClesManquants.length > 0 && (
-        <div className="scan-block">
-          <h3 className="scan-block-title">Mots-clés manquants</h3>
-          <div className="scan-chips">
-            {data.motsClesManquants.map((kw, i) => (
-              <span key={i} className="scan-chip">
-                {kw}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* --- Recommandations --- */}
-      {data.recommandations.length > 0 && (
-        <div className="scan-block">
-          <h3 className="scan-block-title">Recommandations</h3>
-          <ul className="scan-list">
-            {data.recommandations.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
-  );
+export default function ScanReport({data}:{data:ScanResult}) {
+  return <section className="oppy-report" aria-label="Rapport OPPY">
+    <div className="oppy-report-header">
+      <div><p className="oppy-report-kicker">Diagnostic indicatif</p><h2>Ton rapport OPPY</h2></div>
+      <div className="oppy-score">{data.score}<small>/100</small></div>
+    </div>
+    <p className="oppy-disclaimer">Ce score ne mesure ni tes chances d'embauche ni le résultat d'un ATS réel.</p>
+    <div className="oppy-context">
+      <p><strong>Pays :</strong> {data.contexte.pays}</p>
+      <p><strong>Secteur :</strong> {data.contexte.secteur}</p>
+      <p><strong>Recruteur :</strong> {data.contexte.typeRecruteur}</p>
+    </div>
+    {data.contexte.incertitudes.length > 0 && <p className="oppy-disclaimer">À confirmer : {data.contexte.incertitudes.join(" ; ")}</p>}
+    <h3>Les cinq dimensions</h3>
+    {items.map(item => {
+      const d=data.dimensions[item.key];
+      return <div className="oppy-dimension" key={item.key}>
+        <div className="oppy-dimension-title"><strong>{item.label}</strong><span>{d.score}/100</span></div>
+        <div className="oppy-progress"><span style={{width:`${d.score}%`}}/></div>
+        <p>{d.justification}</p>
+      </div>;
+    })}
+    {data.pointsForts.length > 0 && <section className="oppy-section"><h3>Points forts</h3><ul>{data.pointsForts.map((s,i)=><li key={i}>{s}</li>)}</ul></section>}
+    {data.problemes.length > 0 && <section className="oppy-section"><h3>Points à améliorer</h3><ul>{data.problemes.map((s,i)=><li key={i}>{s.texte}</li>)}</ul></section>}
+    {data.motsClesManquants.length > 0 && <section className="oppy-section"><h3>Exigences non démontrées dans le CV</h3><ul>{data.motsClesManquants.map((s,i)=><li key={i}>{s}</li>)}</ul></section>}
+    {data.recommandations.length > 0 && <section className="oppy-section"><h3>Recommandations</h3><ol>{data.recommandations.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
+    {data.questions.length > 0 && <section className="oppy-section"><h3>Questions pour compléter ton parcours</h3><ol>{data.questions.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
+    <p className="oppy-disclaimer">{data.avertissement}</p>
+  </section>;
 }
