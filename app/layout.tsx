@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CV-ATS — Optimise ton CV pour les ATS",
+  title: "OPPY by oaraxoom — Ton potentiel mérite la bonne opportunité",
   description:
-    "Colle ton CV et une annonce d'emploi, obtiens une version optimisée ATS.",
+    "Analyse et améliore ta candidature avec OPPY, l'assistant pensé pour l'Afrique francophone.",
 };
 
 export default function RootLayout({
