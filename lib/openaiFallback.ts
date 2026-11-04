@@ -5,11 +5,10 @@
  * Le compte OpenAI peut toutefois avoir ses propres règles de conservation
  * et de traitement des données : informer explicitement l'utilisateur.
  */
-import type { ScanResult } from "@/lib/scanPrompt";
 
 type OpenAIResult =
   | { ok: true; text: string }
-  | { ok: false; reason: "not-configured" | "unavailable" | "unauthorized" | "invalid" };
+  | { ok: false; reason: "not-configured" | "unavailable" | "unauthorized" | "invalid" | "credits" | "rate-limited" | "timeout"; status?: number; code?: string };
 
 const dimension = {
   type: "object",
@@ -94,18 +93,41 @@ export async function callOpenAIFallback(args: {
         instructions: args.system,
         input: args.user,
         store: false,
-        reasoning: { effort: "low" },
-        max_output_tokens: 5000,
+        reasoning: { effort: "none" },
+        max_output_tokens: 4000,
         text: { format: { type: "json_schema", name: "oppy_scan", strict: true, schema: SCHEMA } },
       }),
       cache: "no-store",
-      signal: AbortSignal.timeout(28000),
+      signal: AbortSignal.timeout(25000),
     });
 
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403)
-        return { ok: false, reason: "unauthorized" };
-      return { ok: false, reason: response.status >= 500 || response.status === 429 ? "unavailable" : "invalid" };
+      // Ne traiter que le statut HTTP et le code technique, jamais le texte
+      // complet du fournisseur (susceptible de contenir du contenu utilisateur).
+      const body = (await response.json().catch(() => null)) as
+        | { error?: { code?: unknown; type?: unknown } }
+        | null;
+      const rawCode = typeof body?.error?.code === "string" ? body.error.code : "";
+      const permittedCodes = [
+        "credit_balance_exhausted", "insufficient_quota",
+        "organization_spend_limit_exceeded", "project_spend_limit_exceeded",
+        "organization_usage_limit_exceeded", "rate_limit_exceeded",
+        "slow_down", "server_is_overloaded", "model_not_found",
+        "invalid_api_key", "invalid_request_error",
+      ];
+      const code = permittedCodes.includes(rawCode) ? rawCode : undefined;
+      const credits = [
+        "credit_balance_exhausted", "insufficient_quota",
+        "organization_spend_limit_exceeded", "project_spend_limit_exceeded",
+        "organization_usage_limit_exceeded",
+      ].includes(rawCode);
+      const reason = response.status === 401 || response.status === 403
+        ? "unauthorized"
+        : credits ? "credits"
+        : response.status === 429 ? "rate-limited"
+        : response.status >= 500 ? "unavailable"
+        : "invalid";
+      return { ok: false, reason, status: response.status, code };
     }
 
     const payload = (await response.json()) as {
@@ -126,7 +148,8 @@ export async function callOpenAIFallback(args: {
 
     // Validation structurelle finale également effectuée dans /api/scan.
     return { ok: true, text };
-  } catch {
-    return { ok: false, reason: "unavailable" };
+  } catch (err) {
+    const timeout = err instanceof Error && /abort|timeout/i.test(err.message);
+    return { ok: false, reason: timeout ? "timeout" : "unavailable" };
   }
 }
