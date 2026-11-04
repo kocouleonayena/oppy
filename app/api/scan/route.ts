@@ -1,3 +1,4 @@
+import { analysisUnavailable, pilotAnalysisEnabled } from "@/lib/pilotAccess";
 import { NextResponse } from "next/server";
 import {
   MODEL,
@@ -58,6 +59,7 @@ function normalize(data: unknown): ScanResult {
 }
 
 export async function POST(request: Request) {
+  if (!pilotAnalysisEnabled()) return analysisUnavailable();
   // 0. Limite de débit : protège la clé API contre les abus.
   const limited = enforceRateLimit(request, "scan", 10, 60_000);
   if (limited) return limited;

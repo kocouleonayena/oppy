@@ -279,7 +279,7 @@ export default function Home() {
         <section className="field result-block">
           <div className="result-head">
             <label htmlFor="result">Résultat optimisé</label>
-            <button onClick={handleCopy} className="secondary">
+            <button onClick={handleCopy} className="secondary" disabled title="Copie indisponible pendant la phase de configuration">
               {copied ? "Copié ✓" : "Copier"}
             </button>
           </div>
@@ -313,17 +313,17 @@ export default function Home() {
           <div className="result-actions">
             <button
               onClick={handleDownloadDocx}
-              disabled={!result || downloading}
+              disabled={true}
               className="primary secondary-action"
             >
-              {downloading ? "Génération…" : "Télécharger en .docx"}
+              {downloading ? "Génération…" : "Export Word bientôt disponible — 500 FCFA"}
             </button>
             <button
               onClick={handleDownloadPdf}
-              disabled={!result || downloadingPdf}
+              disabled={true}
               className="primary"
             >
-              {downloadingPdf ? "Génération…" : "Télécharger ce style (PDF)"}
+              {downloadingPdf ? "Génération…" : "Export PDF bientôt disponible — 500 FCFA"}
             </button>
           </div>
         </section>

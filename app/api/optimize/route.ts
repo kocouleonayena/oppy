@@ -1,3 +1,4 @@
+import { analysisUnavailable, pilotAnalysisEnabled } from "@/lib/pilotAccess";
 import { NextResponse } from "next/server";
 import {
   MODEL,
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  if (!pilotAnalysisEnabled()) return analysisUnavailable();
   // 0. Limite de débit : protège la clé API contre les abus.
   const limited = enforceRateLimit(request, "optimize", 10, 60_000);
   if (limited) return limited;
