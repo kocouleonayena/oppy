@@ -474,3 +474,17 @@ button.primary.secondary-action:hover:not(:disabled) { background: #0b2c66; }
 .oppy-label { color: #123e86; font-size: .75rem; font-weight: 800; letter-spacing: .13em; margin: 0 0 1rem; }
 .oppy-headline { margin: -.15rem 0 1rem; color: #123e86; font-size: clamp(1.35rem,3vw,2.1rem); letter-spacing: -.035em; }
 .oppy-warning { margin-top: 2rem; padding: 1rem 1.25rem; background: #fff9df; border-left: 4px solid #facc15; color: #5a4b16; font-size: .92rem; }
+
+/* Consentement explicite aux prestataires d'analyse du CV */
+.oppy-consent {
+  max-width: 980px;
+  margin: 1.3rem auto 0;
+  border: 1px solid #d6e1f2;
+  background: #ffffff;
+  padding: 1rem 1.2rem;
+  border-radius: .8rem;
+}
+.oppy-consent label { display: flex; align-items: flex-start; gap: .8rem; font-size: .93rem; cursor: pointer; }
+.oppy-consent label input { width: 1.1rem; height: 1.1rem; margin-top: .15rem; accent-color: #123e86; flex-shrink: 0; }
+.oppy-consent p { margin: .6rem 0 0 1.9rem; font-size: .83rem; color: #64748b; }
+.oppy-provider { margin: 1.25rem 0 0; color: #123e86; font-size: .88rem; font-weight: 650; }
