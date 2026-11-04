@@ -470,3 +470,7 @@ button.primary.secondary-action:hover:not(:disabled) { background: #0b2c66; }
 .scan-badge--mid { color: #8d6200; }
 .scan-badge--low { color: #4a5568; }
 .scan-chip { background: #eff5ff; border-color: #dce8ff; color: #123e86; }
+
+.oppy-label { color: #123e86; font-size: .75rem; font-weight: 800; letter-spacing: .13em; margin: 0 0 1rem; }
+.oppy-headline { margin: -.15rem 0 1rem; color: #123e86; font-size: clamp(1.35rem,3vw,2.1rem); letter-spacing: -.035em; }
+.oppy-warning { margin-top: 2rem; padding: 1rem 1.25rem; background: #fff9df; border-left: 4px solid #facc15; color: #5a4b16; font-size: .92rem; }
