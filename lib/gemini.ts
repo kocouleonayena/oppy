@@ -39,12 +39,9 @@ export async function callGemini(opts: {
         // Force une sortie JSON pure (pas de blocs Markdown autour).
         responseMimeType: "application/json",
         maxOutputTokens: opts.maxOutputTokens,
-        temperature: opts.temperature,
-        // IMPORTANT : Gemini 2.5 « réfléchit » par défaut, et ces tokens de
-        // réflexion consomment le budget de sortie — au risque de renvoyer une
-        // réponse vide. Pour une extraction structurée comme la nôtre, on
-        // désactive le thinking : plus rapide, plus fiable, moins de quota.
-        thinkingConfig: { thinkingBudget: 0 },
+        // Gemini 3.8 Flash utilise thinkingLevel (et non thinkingBudget).
+        // Niveau faible pour maîtriser la latence et les coûts du pilote.
+        thinkingConfig: { thinkingLevel: "LOW" },
       },
     });
 
