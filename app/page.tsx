@@ -34,9 +34,9 @@ export default function Home() {
   const resultText = result ? cvContentToText(result) : "";
 
   const busy = loading || scanLoading || importing;
-  // Optimiser exige le CV ET l'annonce ; Scanner n'exige que le CV.
+  // OPPY compare obligatoirement le CV à une opportunité.
   const canOptimize = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
-  const canScan = cv.trim().length > 0 && !busy;
+  const canScan = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
 
   async function handleOptimize() {
     setLoading(true);
@@ -208,12 +208,13 @@ export default function Home() {
   return (
     <main className="container">
       <header className="header">
-        <h1>CV-ATS</h1>
+        <p className="oppy-label">UN PRODUIT OARAXOOM · VERSION DE DÉVELOPPEMENT</p>
+        <h1>oppy</h1>
+        <h2 className="oppy-headline">Ton potentiel mérite la bonne opportunité.</h2>
         <p className="subtitle">
-          Colle ton CV et l&apos;annonce visée. <strong>Optimiser</strong> réécrit
-          ton CV en version ATS ; <strong>Scanner</strong> diagnostique sa
-          compatibilité (l&apos;annonce est alors optionnelle). Aucune donnée
-          n&apos;est stockée.
+          Importe ton CV en PDF ou Word, puis colle le texte de l&apos;offre visée.
+          Vérifie tes informations avant de lancer l&apos;analyse. OPPY t&apos;aide
+          à mieux présenter ton parcours, sans inventer tes expériences.
         </p>
       </header>
 
@@ -241,7 +242,7 @@ export default function Home() {
             id="cv"
             value={cv}
             onChange={(e) => setCv(e.target.value)}
-            placeholder="Colle ici le texte de ton CV, ou importe un .pdf / .docx…"
+            placeholder="Importe un fichier PDF ou Word. Tu pourras ici vérifier et corriger les informations extraites."
             rows={16}
           />
           {notice && <p className="notice">{notice}</p>}
@@ -249,8 +250,7 @@ export default function Home() {
 
         <div className="field">
           <label htmlFor="annonce">
-            L&apos;annonce d&apos;emploi{" "}
-            <span className="label-hint">(optionnelle pour le scan)</span>
+            Le texte de l&apos;opportunité
           </label>
           <textarea
             id="annonce"
@@ -264,10 +264,10 @@ export default function Home() {
 
       <div className="actions">
         <button onClick={handleOptimize} disabled={!canOptimize} className="primary">
-          {loading ? "Optimisation en cours…" : "Optimiser"}
+          {loading ? "Optimisation en cours…" : "Prévisualiser le CV amélioré"}
         </button>
         <button onClick={handleScan} disabled={!canScan} className="primary secondary-action">
-          {scanLoading ? "Scan en cours…" : "Scanner mon CV"}
+          {scanLoading ? "Scan en cours…" : "Analyser ma candidature"}
         </button>
       </div>
 
@@ -329,6 +329,7 @@ export default function Home() {
         </section>
       )}
 
+      <p className="oppy-warning">Prototype technique : les cinq scores OPPY, l’accès par URL, le quota gratuit et les paiements FedaPay ne sont pas encore intégrés. Ne pas ouvrir au public.</p>
       <AtsGuide />
     </main>
   );
