@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./oppy-report.css";
 
 export const metadata: Metadata = {
   title: "OPPY by oaraxoom — Ton potentiel mérite la bonne opportunité",
