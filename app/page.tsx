@@ -120,7 +120,7 @@ export default function Home() {
       // On remplit la zone CV : l'utilisateur peut relire/corriger ensuite.
       setCv(data.text ?? "");
       setNotice(
-        `Texte importé depuis « ${file.name} ». Relis-le et corrige si besoin avant d'optimiser ou scanner.`
+        `Texte importé depuis « ${file.name} ». Relis-le et corrige-le si nécessaire avant de lancer l'analyse.`
       );
     } catch {
       setError("Impossible de contacter le serveur pour l'import. Réessaie.");
@@ -329,7 +329,7 @@ export default function Home() {
         </section>
       )}
 
-      <p className="oppy-warning">Pilote privé : l’analyse IA reste désactivée jusqu’à la configuration sécurisée du quota. Une seule analyse gratuite est prévue par connexion réseau sur 180 jours, ce qui peut affecter les réseaux partagés. Les paiements, les offres par URL et la réécriture du CV seront disponibles ultérieurement. Utilise des CV fictifs ou anonymisés pour les tests.</p>
+      <p className="oppy-warning">Pilote privé : la première analyse gratuite est activée dans cet environnement de test. Une seule analyse est prévue par connexion réseau sur 180 jours, ce qui peut affecter les réseaux partagés. En cas d'indisponibilité de l'IA, l'analyse n'est pas décomptée. Utilise uniquement des CV fictifs ou anonymisés ; les paiements et l'analyse des offres par URL sont encore en préparation.</p>
       <AtsGuide />
     </main>
   );
