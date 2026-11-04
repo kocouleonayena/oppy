@@ -1,3 +1,4 @@
+import { reserveFreeAnalysis } from "@/lib/freeAnalysis";
 import { analysisUnavailable, pilotAnalysisEnabled } from "@/lib/pilotAccess";
 import { NextResponse } from "next/server";
 import {
@@ -84,6 +85,11 @@ export async function POST(request: Request) {
 
   if (cv.length > 30000 || (annonce?.length ?? 0) > 20000) return NextResponse.json({ error: "Document trop long." }, { status: 413 });
 
+  // Réservation atomique avant l'appel coûteux au modèle.
+  // En phase pilote, seul le diagnostic gratuit est autorisé.
+  const reservation = await reserveFreeAnalysis(request);
+  if (!reservation.ok) return NextResponse.json({error: reservation.error}, {status: reservation.status, headers: {"Cache-Control": "no-store"}});
+
   // 2. Appel à Gemini. Aucune donnée n'est stockée.
   const res = await callGemini({
     model: MODEL,
@@ -118,12 +124,12 @@ export async function POST(request: Request) {
   try {
     result = normalize(parseLenientJson(res.text));
   } catch {
-    console.error("Scan : JSON invalide reçu du modèle:", res.text.slice(0, 500));
+    console.error("Scan : format JSON invalide reçu du modèle.");
     return NextResponse.json(
       { error: "Le diagnostic n'a pas pu être lu (format inattendu). Réessaie." },
       { status: 502 }
     );
   }
 
-  return NextResponse.json({ result });
+  return NextResponse.json({ result }, { headers: { "Cache-Control": "no-store" } });
 }
