@@ -19,6 +19,8 @@ export default function Home() {
   const [annonce, setAnnonce] = useState("");
   const [result, setResult] = useState<CvContent | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [aiProvidersConsent, setAiProvidersConsent] = useState(false);
+  const [usedProvider, setUsedProvider] = useState<"gemini" | "openai" | null>(null);
   const [loading, setLoading] = useState(false); // optimisation
   const [scanLoading, setScanLoading] = useState(false); // scan
   const [importing, setImporting] = useState(false); // import de fichier
@@ -36,7 +38,7 @@ export default function Home() {
   const busy = loading || scanLoading || importing;
   // OPPY compare obligatoirement le CV à une opportunité.
   const canOptimize = cv.trim().length > 0 && annonce.trim().length > 0 && !busy;
-  const canScan = cv.trim().length >= 50 && annonce.trim().length >= 50 && !busy;
+  const canScan = cv.trim().length >= 50 && annonce.trim().length >= 50 && aiProvidersConsent && !busy;
 
   async function handleOptimize() {
     setLoading(true);
@@ -72,12 +74,13 @@ export default function Home() {
     setError("");
     setScanResult(null);
     setResult(null);
+    setUsedProvider(null);
 
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cv, annonce }),
+        body: JSON.stringify({ cv, annonce, aiProvidersConsent }),
       });
 
       const data = await res.json();
@@ -88,6 +91,7 @@ export default function Home() {
       }
 
       setScanResult(data.result ?? null);
+      setUsedProvider(data.provider === "openai" ? "openai" : "gemini");
     } catch {
       setError("Impossible de contacter le serveur. Réessaie.");
     } finally {
@@ -262,6 +266,19 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="oppy-consent">
+        <label>
+          <input
+            type="checkbox"
+            checked={aiProvidersConsent}
+            onChange={e => setAiProvidersConsent(e.target.checked)}
+            disabled={busy}
+          />
+          <span>J'accepte que les informations de mon CV et de l'offre soient transmises à Google Gemini pour l'analyse et, seulement en cas d'indisponibilité, à OpenAI pour assurer le service.</span>
+        </label>
+        <p>Ces prestataires traitent les données selon leurs conditions. Pour ce pilote, utilise uniquement un CV fictif ou anonymisé.</p>
+      </div>
+
       <div className="actions">
         <button onClick={handleOptimize} disabled={true} className="primary" title="À venir après l’activation des achats">
           {"Aperçu du CV amélioré — prochainement"}
@@ -273,7 +290,7 @@ export default function Home() {
 
       {error && <div className="error">{error}</div>}
 
-      {scanResult && <ScanReport data={scanResult} />}
+      {scanResult && <><p className="oppy-provider">Analyse réalisée par {usedProvider === "openai" ? "OpenAI (solution de secours)" : "Gemini"}.</p><ScanReport data={scanResult} /></>}
 
       {result && (
         <section className="field result-block">
