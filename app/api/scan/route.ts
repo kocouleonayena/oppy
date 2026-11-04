@@ -100,6 +100,7 @@ export async function POST(request: Request) {
   });
 
   if (!res.ok) {
+    await reservation.release();
     if (res.reason === "no-key") {
       return NextResponse.json(
         { error: "Clé API manquante. Définis GEMINI_API_KEY dans .env.local." },
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-    console.error("Erreur /api/scan:", res.reason, res.detail ?? "");
+    console.error("Erreur /api/scan:", res.reason, typeof res.detail === "string" ? res.detail.slice(0, 600) : "");
     return NextResponse.json(
       { error: "Le scan a échoué. Réessaie dans un instant." },
       { status: 502 }
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
   try {
     result = normalize(parseLenientJson(res.text));
   } catch {
+    await reservation.release();
     console.error("Scan : format JSON invalide reçu du modèle.");
     return NextResponse.json(
       { error: "Le diagnostic n'a pas pu être lu (format inattendu). Réessaie." },
