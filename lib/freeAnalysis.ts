@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { getClientIp } from "@/lib/rateLimit";
 
 /**
@@ -7,7 +7,7 @@ import { getClientIp } from "@/lib/rateLimit";
  * Sans configuration Redis et secret serveur, refus systématique.
  */
 export async function reserveFreeAnalysis(request: Request): Promise<
-  | { ok: true }
+  | { ok: true; release: () => Promise<void> }
   | { ok: false; status: number; error: string }
 > {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -25,7 +25,9 @@ export async function reserveFreeAnalysis(request: Request): Promise<
   const fingerprint = createHmac("sha256", pepper).update(ip).digest("hex");
   const now = new Date();
   const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const userKey = `oppy:free:${fingerprint}`;
+  // V2 : autorise un nouvel essai pour les tests ayant échoué avec l’ancien modèle.
+  const userKey = `oppy:free:v2:${fingerprint}`;
+  const reservationId = randomUUID();
   const globalKey = `oppy:pilot:month:${month}`;
   const max = Math.max(1, Math.min(1000, Number(process.env.OPPY_MONTHLY_AI_LIMIT || "30") || 30));
 
@@ -35,7 +37,7 @@ export async function reserveFreeAnalysis(request: Request): Promise<
     if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
     local used = tonumber(redis.call('GET', KEYS[2]) or '0')
     if used >= tonumber(ARGV[1]) then return -1 end
-    redis.call('SET', KEYS[1], 'used', 'EX', 15552000)
+    redis.call('SET', KEYS[1], ARGV[2], 'EX', 15552000)
     redis.call('INCR', KEYS[2])
     redis.call('EXPIRE', KEYS[2], 3024000)
     return 1
@@ -44,14 +46,36 @@ export async function reserveFreeAnalysis(request: Request): Promise<
     const response = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(["EVAL", lua, 2, userKey, globalKey, String(max)]),
+      body: JSON.stringify(["EVAL", lua, 2, userKey, globalKey, String(max), reservationId]),
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) throw new Error("Quota store failed");
     const data: unknown = await response.json();
     const result = Number((data as {result?: unknown}).result);
-    if (result === 1) return { ok: true };
+    if (result === 1) return {
+      ok: true,
+      release: async () => {
+        // Seul l'essai qui a réservé le quota peut le restituer.
+        // Si Redis est indisponible, conserver la réservation plutôt que risquer
+        // une double consommation non contrôlée.
+        const rollback = `
+          if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+          redis.call('DEL', KEYS[1])
+          if tonumber(redis.call('GET', KEYS[2]) or '0') > 0 then redis.call('DECR', KEYS[2]) end
+          return 1
+        `;
+        try {
+          await fetch(url, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(["EVAL", rollback, 2, userKey, globalKey, reservationId]),
+            cache: "no-store",
+            signal: AbortSignal.timeout(5000),
+          });
+        } catch { /* conservatisme : quota conservé si rollback impossible */ }
+      },
+    };
     if (result === 0) return { ok: false, status: 429, error: "Une analyse gratuite a déjà été utilisée depuis cette connexion. Les analyses supplémentaires seront disponibles après activation des paiements." };
     if (result === -1) return { ok: false, status: 429, error: "Le quota de tests gratuits du mois est atteint." };
     throw new Error("Unexpected quota response");
