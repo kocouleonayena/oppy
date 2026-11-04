@@ -8,10 +8,10 @@ Le code de l'analyse gratuite est préparé, mais l'appel IA demeure **désactiv
 
 1. Créer une base **Upstash Redis** via le Marketplace Vercel (ou Upstash directement).
 2. Configurer les variables ci-dessous **dans Vercel → Project → Settings → Environment Variables**, jamais dans GitHub ni dans le chat :
-   - `UPSTASH_REDIS_REST_URL` : URL HTTPS du stockage Redis.
-   - `UPSTASH_REDIS_REST_TOKEN` : jeton secret REST, uniquement côté serveur.
+   - `KV_REST_API_URL` : URL HTTPS ajoutée automatiquement par l'intégration Vercel–Upstash (ou `UPSTASH_REDIS_REST_URL`).
+   - `KV_REST_API_TOKEN` : jeton secret REST ajouté automatiquement par l'intégration (ou `UPSTASH_REDIS_REST_TOKEN`).
    - `OPPY_QUOTA_SECRET` : secret aléatoire côté serveur d'au moins 24 caractères, stable entre les déploiements.
-   - `OPPY_MONTHLY_AI_LIMIT` : plafond de réservations mensuelles (par exemple `30` pour les tests privés).
+   - `OPPY_MONTHLY_AI_LIMIT` : plafond de réservations mensuelles (configuré à `10` en Preview pour les premiers tests).
    - `GEMINI_API_KEY` : clé API Gemini, uniquement côté serveur.
    - `OPPY_PILOT_AI_ENABLED` : `false` au début ; activer seulement après vérification.
 3. Maintenir Vercel Authentication / Deployment Protection durant le pilote.
@@ -46,3 +46,7 @@ Le code de l'analyse gratuite est préparé, mais l'appel IA demeure **désactiv
 - Édition interactive du CV, prévisualisation sans export, et rapports téléchargeables.
 - Conservation des documents avec consentement et suppression.
 - Analyse gratuite par véritable personne ou compte, plutôt que par IP, si besoin d'un contrôle robuste.
+
+## État constaté dans Vercel
+
+L'intégration Upstash est installée et les variables `KV_REST_API_URL` et `KV_REST_API_TOKEN` sont présentes en Preview et Production. Le code accepte désormais ces noms. `GEMINI_API_KEY` et `OPPY_QUOTA_SECRET` ne figurent pas encore parmi les variables configurées au moment de cette vérification ; **ne pas activer le moteur IA avant leur création et la validation du quota**.
