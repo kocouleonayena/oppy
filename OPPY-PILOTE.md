@@ -50,3 +50,15 @@ Le code de l'analyse gratuite est préparé, mais l'appel IA demeure **désactiv
 ## État constaté dans Vercel
 
 L'intégration Upstash est installée et les variables `KV_REST_API_URL` et `KV_REST_API_TOKEN` sont présentes en Preview et Production. Le code accepte désormais ces noms. `GEMINI_API_KEY` et `OPPY_QUOTA_SECRET` ne figurent pas encore parmi les variables configurées au moment de cette vérification ; **ne pas activer le moteur IA avant leur création et la validation du quota**.
+
+## Secours OpenAI (optionnel)
+- Gemini est tenté d'abord ; un appel OpenAI intervient seulement quand Gemini ne fournit pas de résultat exploitable pour cause d'indisponibilité.
+- Le modèle de secours retenu est `gpt-6-luna`, via `POST /v1/responses` et une sortie JSON structurée.
+- Dans **Vercel → OPPY → Settings → Environment Variables**, créer `OPENAI_API_KEY` comme valeur **Sensitive**, cible **Preview** seulement. Ne jamais placer la clé dans GitHub ni dans un message.
+- Le compte API OpenAI doit posséder des crédits, une autorisation d'accès au modèle et un plafond de dépenses adapté au pilote. Un abonnement ChatGPT ne donne pas automatiquement un crédit API.
+- Le code utilise `store: false`, mais la confidentialité doit aussi respecter les règles de traitement et de conservation propres à OpenAI et Google.
+- Le candidat doit cocher une case de consentement avant de lancer l'analyse : sans accord, aucun appel IA n'est effectué.
+- Le secours reçoit les mêmes extraits de CV et d'offre que Gemini, uniquement après l'échec du premier fournisseur.
+- Le quota Redis demeure **un seul appel d'analyse réservé** même si les deux modèles sont sollicités. L'échec global déclenche une tentative de libération de la réservation.
+- Le plafond de 10 analyses **n'est pas** un plafond monétaire garanti. Surveiller séparément l'utilisation OpenAI et Gemini.
+- Après ajout de la variable `OPENAI_API_KEY`, redéployer la branche de prévisualisation ; ne pas activer ce secours en production.
