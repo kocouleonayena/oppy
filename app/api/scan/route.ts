@@ -158,5 +158,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // Une analyse n'est marquée utilisée qu'après un rapport valide.
+  // Une réservation non finalisée expire après 180 s, ce qui évite de bloquer
+  // le candidat pendant des mois après un incident ou un arrêt de fonction.
+  const committed = await reservation.commit();
+  if (!committed) {
+    console.error("OPPY quota commit failed after successful analysis");
+    // L'analyse est déjà produite : ne pas masquer le résultat au candidat.
+  }
   return NextResponse.json({ result, provider }, { headers: { "Cache-Control": "no-store" } });
 }
