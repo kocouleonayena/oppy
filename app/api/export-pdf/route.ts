@@ -1,3 +1,4 @@
+import { paidFeatureUnavailable } from "@/lib/pilotAccess";
 import { NextResponse } from "next/server";
 import { buildCvPdf, type PdfStyle } from "@/lib/pdfTemplates";
 import { normalizeCvContent } from "@/lib/prompt";
@@ -10,6 +11,12 @@ export const dynamic = "force-dynamic";
 const STYLES: PdfStyle[] = ["moderne", "finance", "minimal"];
 
 export async function POST(request: Request) {
+  // Accès systématiquement bloqué jusqu'à la vérification des droits d'achat côté serveur.
+  return paidFeatureUnavailable();
+}
+
+/* Ancienne implémentation conservée temporairement pour migration :
+async function legacyPOST(request: Request) {
   // 0. Limite de débit (génération de document).
   const limited = enforceRateLimit(request, "export-pdf", 30, 60_000);
   if (limited) return limited;
@@ -55,3 +62,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+*/
