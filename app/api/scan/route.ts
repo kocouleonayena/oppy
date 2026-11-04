@@ -26,35 +26,38 @@ export const maxDuration = 60;
  */
 function normalize(data: unknown): ScanResult {
   const obj = (data ?? {}) as Record<string, unknown>;
-
-  const scoreRaw = Number(obj.score);
-  const score = Number.isFinite(scoreRaw)
-    ? Math.max(0, Math.min(100, Math.round(scoreRaw)))
-    : 0;
-
-  const asStringArray = (v: unknown): string[] =>
-    Array.isArray(v)
-      ? v.map((x) => String(x).trim()).filter((x) => x.length > 0)
-      : [];
-
-  const severites = new Set(["élevée", "moyenne", "faible"]);
-  const problemes = Array.isArray(obj.problemes)
-    ? obj.problemes
-        .map((p) => {
-          const po = (p ?? {}) as Record<string, unknown>;
-          const severite = String(po.severite);
-          const texte = String(po.texte ?? "").trim();
-          return { severite, texte };
-        })
-        .filter((p) => severites.has(p.severite) && p.texte.length > 0)
+  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0; };
+  const strings = (v: unknown): string[] => Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === "string").map(x => x.trim()).filter(Boolean).slice(0, 15)
     : [];
-
+  const dimRaw = (obj.dimensions ?? {}) as Record<string, unknown>;
+  const keys = ["adequation", "competences", "experiences", "presentation", "valorisation"] as const;
+  const dimensions = {} as ScanResult["dimensions"];
+  for (const key of keys) {
+    const d = (dimRaw[key] ?? {}) as Record<string, unknown>;
+    dimensions[key] = { score: num(d.score), justification: typeof d.justification === "string" ? d.justification.slice(0, 600) : "Justification indisponible." };
+  }
+  const cx = (obj.contexte ?? {}) as Record<string, unknown>;
+  const problems = Array.isArray(obj.problemes) ? obj.problemes : [];
+  const severites = ["élevée","moyenne","faible"];
   return {
-    score,
-    pointsForts: asStringArray(obj.pointsForts),
-    problemes: problemes as ScanResult["problemes"],
-    motsClesManquants: asStringArray(obj.motsClesManquants),
-    recommandations: asStringArray(obj.recommandations),
+    score: num(obj.score),
+    dimensions,
+    contexte: {
+      pays: typeof cx.pays === "string" ? cx.pays.slice(0, 120) : "Non déterminé",
+      secteur: typeof cx.secteur === "string" ? cx.secteur.slice(0, 120) : "Non déterminé",
+      typeRecruteur: typeof cx.typeRecruteur === "string" ? cx.typeRecruteur.slice(0, 120) : "Non déterminé",
+      incertitudes: strings(cx.incertitudes).slice(0, 5),
+    },
+    pointsForts: strings(obj.pointsForts),
+    problemes: problems.map((p: unknown) => {
+      const v = (p ?? {}) as Record<string, unknown>;
+      return { severite: severites.includes(String(v.severite)) ? String(v.severite) : "faible", texte: typeof v.texte === "string" ? v.texte.trim() : "" };
+    }).filter((p: {texte:string}) => p.texte.length > 0).slice(0, 15) as ScanResult["problemes"],
+    motsClesManquants: strings(obj.motsClesManquants),
+    recommandations: strings(obj.recommandations),
+    questions: strings(obj.questions).slice(0, 3),
+    avertissement: typeof obj.avertissement === "string" ? obj.avertissement.slice(0,400) : "Évaluation indicative fondée sur les informations fournies.",
   };
 }
 
@@ -75,9 +78,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Corps de requête invalide." }, { status: 400 });
   }
 
-  if (!cv) {
-    return NextResponse.json({ error: "Le CV est requis." }, { status: 400 });
+  if (!cv || !annonce) {
+    return NextResponse.json({ error: "Le CV et le texte de l’offre sont requis." }, { status: 400 });
   }
+
+  if (cv.length > 30000 || (annonce?.length ?? 0) > 20000) return NextResponse.json({ error: "Document trop long." }, { status: 413 });
 
   // 2. Appel à Gemini. Aucune donnée n'est stockée.
   const res = await callGemini({
