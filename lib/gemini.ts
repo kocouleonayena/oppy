@@ -41,7 +41,7 @@ export async function callGemini(opts: {
         maxOutputTokens: opts.maxOutputTokens,
         // Gemini 3.8 Flash utilise thinkingLevel (et non thinkingBudget).
         // Niveau faible pour maîtriser la latence et les coûts du pilote.
-        thinkingConfig: { thinkingLevel: "LOW" },
+        thinkingConfig: { thinkingLevel: "low" },
       },
     });
 
