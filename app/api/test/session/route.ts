@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTeamUsage } from "@/lib/teamQuota";
 import {
   internalTestingEnabled, isTester, validAccessCode, newTesterCookie,
   expiredTesterCookie, originAllowed, limitLoginAttempts
@@ -8,9 +9,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const authenticated=isTester(request);
+  const usage=authenticated?await getTeamUsage(request):null;
   return NextResponse.json({
     enabled: internalTestingEnabled(),
-    authenticated: isTester(request),
+    authenticated,
+    usage,
   }, {headers: {"Cache-Control": "no-store"}});
 }
 export async function POST(request: NextRequest) {
