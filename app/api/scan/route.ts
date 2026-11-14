@@ -39,11 +39,20 @@ function normalize(data: unknown): ScanResult {
     const d = (dimRaw[key] ?? {}) as Record<string, unknown>;
     dimensions[key] = { score: num(d.score), justification: typeof d.justification === "string" ? d.justification.slice(0, 600) : "Justification indisponible." };
   }
+  // Calcul déterministe du score global : même pondération pour Gemini et OpenAI.
+  // Les notes partielles restent des estimations pédagogiques proposées par l'IA.
+  const weightedScore = Math.round(
+    dimensions.adequation.score * 0.40 +
+    dimensions.competences.score * 0.20 +
+    dimensions.experiences.score * 0.15 +
+    dimensions.presentation.score * 0.10 +
+    dimensions.valorisation.score * 0.15
+  );
   const cx = (obj.contexte ?? {}) as Record<string, unknown>;
   const problems = Array.isArray(obj.problemes) ? obj.problemes : [];
   const severites = ["élevée","moyenne","faible"];
   return {
-    score: num(obj.score),
+    score: weightedScore,
     dimensions,
     contexte: {
       pays: typeof cx.pays === "string" ? cx.pays.slice(0, 120) : "Non déterminé",
