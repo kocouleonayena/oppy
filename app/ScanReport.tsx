@@ -33,8 +33,8 @@ export default function ScanReport({data}:{data:ScanResult}) {
     {data.pointsForts.length > 0 && <section className="oppy-section"><h3>Points forts</h3><ul>{data.pointsForts.map((s,i)=><li key={i}>{s}</li>)}</ul></section>}
     {data.problemes.length > 0 && <section className="oppy-section"><h3>Points à améliorer</h3><ul>{data.problemes.map((s,i)=><li key={i}>{s.texte}</li>)}</ul></section>}
     {data.motsClesManquants.length > 0 && <section className="oppy-section"><h3>Exigences non démontrées dans le CV</h3><ul>{data.motsClesManquants.map((s,i)=><li key={i}>{s}</li>)}</ul></section>}
-    {data.recommandations.length > 0 && <section className="oppy-section"><h3>Recommandations</h3><ol>{data.recommandations.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
-    {data.questions.length > 0 && <section className="oppy-section"><h3>Questions pour compléter ton parcours</h3><ol>{data.questions.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
+    {data.recommandations.length > 0 && <section className="oppy-section"><h3>Actions prioritaires pour améliorer ton CV</h3><ol>{data.recommandations.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
+    {data.questions.length > 0 && <section className="oppy-section"><h3>Informations à confirmer avant d’améliorer ton CV</h3><ol>{data.questions.map((s,i)=><li key={i}>{s}</li>)}</ol></section>}
     <p className="oppy-disclaimer">{data.avertissement}</p>
   </section>;
 }
