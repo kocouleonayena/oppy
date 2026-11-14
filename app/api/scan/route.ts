@@ -1,3 +1,5 @@
+import { reserveTeamAnalysis } from "@/lib/teamQuota";
+import { originAllowed, isTester } from "@/lib/teamAccess";
 import { callOpenAIFallback } from "@/lib/openaiFallback";
 import { reserveFreeAnalysis } from "@/lib/freeAnalysis";
 import { analysisUnavailable, pilotAnalysisEnabled } from "@/lib/pilotAccess";
@@ -82,11 +84,13 @@ export async function POST(request: Request) {
   let cv: string;
   let annonce: string | undefined;
   let aiProvidersConsent = false;
+  let internalTest = false;
   try {
     const body = await request.json();
     cv = typeof body?.cv === "string" ? body.cv.trim() : "";
     annonce = typeof body?.annonce === "string" ? body.annonce.trim() : "";
     aiProvidersConsent = body?.aiProvidersConsent === true;
+    internalTest = body?.internalTest === true;
   } catch {
     return NextResponse.json({ error: "Corps de requête invalide." }, { status: 400 });
   }
@@ -104,9 +108,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Réservation atomique avant l'appel coûteux au modèle.
-  // En phase pilote, seul le diagnostic gratuit est autorisé.
-  const reservation = await reserveFreeAnalysis(request);
+  // Le mode équipe exige une session signée côté serveur et une requête
+  // provenant de l'origine OPPY. Un champ JSON ne suffit jamais pour contourner le quota.
+  if (internalTest && (!originAllowed(request) || !isTester(request))) {
+    return NextResponse.json({error:"Accès aux tests internes non autorisé."},{status:403});
+  }
+  // Quotas indépendants dans Redis : gratuit public vs essais d'équipe.
+  const reservation = internalTest
+    ? await reserveTeamAnalysis(request)
+    : await reserveFreeAnalysis(request);
   if (!reservation.ok) return NextResponse.json({error: reservation.error}, {status: reservation.status, headers: {"Cache-Control": "no-store"}});
 
   // Gemini reste prioritaire ; OpenAI n'est appelé qu'avec l'accord de l'utilisateur.
