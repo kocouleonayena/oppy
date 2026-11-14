@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ScanReport from "../ScanReport";
+import "./test.css";
 import type { ScanResult } from "@/lib/scanPrompt";
 import { TEST_CASES } from "@/lib/testCases";
 
