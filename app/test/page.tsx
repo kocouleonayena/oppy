@@ -33,6 +33,7 @@ export default function InternalTestPage() {
  const [message,setMessage]=useState("");
  const [error,setError]=useState("");
  const [quota,setQuota]=useState<{used:number;limit:number}|null>(null);
+ const [dashboardRevision,setDashboardRevision]=useState(0);
  const sample=TEST_CASES.find(x=>x.id===caseId) || TEST_CASES[0];
 
  async function refresh() {
