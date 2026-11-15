@@ -1,0 +1,16 @@
+.oppy-report{background:#fff;border:1px solid #dce3ed;border-radius:16px;padding:24px;margin-top:24px}
+.oppy-report-header,.oppy-dimension-title{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.oppy-report-header h2{color:#123e86;margin:0;font-size:24px}
+.oppy-report-kicker,.oppy-disclaimer{font-size:13px;color:#64748b}
+.oppy-report-kicker{text-transform:uppercase;letter-spacing:.08em;margin:0}
+.oppy-score{font-size:36px;font-weight:800;color:#123e86;white-space:nowrap}
+.oppy-score small{font-size:14px;color:#64748b}
+.oppy-context{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;background:#f4f7fc;padding:16px;border-radius:12px}
+.oppy-context p,.oppy-dimension p{font-size:14px;margin:0}
+.oppy-dimension{margin:18px 0}
+.oppy-progress{height:8px;border-radius:16px;background:#e6ecf5;margin:8px 0;overflow:hidden}
+.oppy-progress span{height:100%;display:block;background:#123e86}
+.oppy-section{border-top:1px solid #edf0f5;margin-top:20px;padding-top:10px}
+.oppy-section h3,.oppy-report h3{color:#123e86}
+.oppy-section li{margin-bottom:8px}
+@media(max-width:720px){.oppy-context{grid-template-columns:1fr}}
