@@ -1,3 +1,4 @@
+import { validateReport } from "@/lib/scanValidation";
 import { reserveTeamAnalysis } from "@/lib/teamQuota";
 import { originAllowed, isTester } from "@/lib/teamAccess";
 import { callOpenAIFallback } from "@/lib/openaiFallback";
@@ -12,7 +13,6 @@ import {
   buildScanUserPrompt,
   type ScanResult,
 } from "@/lib/scanPrompt";
-import { parseLenientJson } from "@/lib/lenientJson";
 import { enforceRateLimit } from "@/lib/rateLimit";
 import { callGemini } from "@/lib/gemini";
 
@@ -119,73 +119,72 @@ export async function POST(request: Request) {
     : await reserveFreeAnalysis(request);
   if (!reservation.ok) return NextResponse.json({error: reservation.error}, {status: reservation.status, headers: {"Cache-Control": "no-store"}});
 
-  // Gemini reste prioritaire ; OpenAI n'est appelé qu'avec l'accord de l'utilisateur.
+  // Le même contrat valide les deux fournisseurs. Une réponse HTTP 200 ne
+  // garantit pas un JSON complet, et une sortie invalide déclenche le secours.
   const system = SCAN_SYSTEM_PROMPT;
   const user = buildScanUserPrompt(cv, annonce);
+  let parsedReport: unknown = null;
+  let provider: "gemini" | "openai" = "gemini";
+  let geminiFailure = "none";
+  let backupFailure = "none";
+
   const primary = await callGemini({
     model: MODEL, system, user,
     maxOutputTokens: MAX_TOKENS,
     temperature: TEMPERATURE,
   });
-
-  let reportText = "";
-  let provider: "gemini" | "openai" = "gemini";
-
   if (primary.ok) {
-    reportText = primary.text;
+    try {
+      parsedReport = validateReport(primary.text);
+    } catch {
+      geminiFailure = "invalid-report";
+    }
   } else {
-    const fallbackAllowed = ["unavailable", "error", "empty", "no-key"].includes(primary.reason);
-    if (fallbackAllowed) {
-      const backup = await callOpenAIFallback({ system, user });
-      if (backup.ok) {
-        reportText = backup.text;
+    geminiFailure = primary.reason;
+  }
+
+  if (parsedReport === null) {
+    const backup = await callOpenAIFallback({system, user});
+    if (backup.ok) {
+      try {
+        parsedReport = validateReport(backup.text);
         provider = "openai";
-      } else {
-        await reservation.release();
-        // Les documents et les réponses brutes ne sont jamais journalisés.
-        console.error("OPPY AI providers failed", {
-          gemini: primary.reason,
-          openai: backup.reason,
-          openaiHttpStatus: backup.status ?? null,
-          openaiErrorCode: backup.code ?? null,
-        });
-        const messages: Record<string, string> = {
-          "not-configured": "La clé OpenAI n'est pas configurée dans cet environnement de test.",
-          "unauthorized": "La clé OpenAI a été refusée ou le projet n'est pas autorisé à utiliser l'API. Vérifie la clé et ses autorisations dans OpenAI Platform.",
-          "credits": "Le compte API OpenAI n'a plus de crédits disponibles ou a atteint sa limite de dépenses. Vérifie la facturation et les plafonds du projet OpenAI.",
-          "rate-limited": "OpenAI limite temporairement les requêtes. Réessaie plus tard ou vérifie les limites API du projet.",
-          "timeout": "Gemini est indisponible et OpenAI n'a pas répondu dans le délai imparti. Ton analyse gratuite reste disponible.",
-          "invalid": "OpenAI a rejeté la demande d'analyse. La configuration de l'API doit être corrigée avant un nouvel essai.",
-          "unavailable": "Gemini et OpenAI sont temporairement indisponibles. Ton analyse gratuite reste disponible.",
-        };
-        return NextResponse.json({
-          error: messages[backup.reason] ?? messages.unavailable,
-        }, {
-          status: 503,
-          headers: { "Cache-Control": "no-store", "Retry-After": "60" },
-        });
+      } catch {
+        backupFailure = "invalid-report";
       }
     } else {
-      await reservation.release();
-      return NextResponse.json(
-        { error: "L'analyse n'a pas abouti. Ton essai gratuit n'a pas été décompté." },
-        { status: 502, headers: { "Cache-Control": "no-store" } }
-      );
+      backupFailure = backup.reason;
+      // Ne journaliser ni CV, ni offre, ni réponse du modèle, ni clé secrète.
+      console.error("OPPY AI fallback failed", {
+        gemini: geminiFailure,
+        openai: backup.reason,
+        openaiHttpStatus: backup.status ?? null,
+        openaiErrorCode: backup.code ?? null,
+      });
     }
   }
 
-  // 3. Parse + validation du JSON structuré.
-  let result: ScanResult;
-  try {
-    result = normalize(parseLenientJson(reportText));
-  } catch {
+  if (parsedReport === null) {
     await reservation.release();
-    console.error("Scan : format JSON invalide reçu du modèle.");
-    return NextResponse.json(
-      { error: "Le diagnostic n'a pas pu être lu (format inattendu). Réessaie." },
-      { status: 502 }
-    );
+    console.error("OPPY no valid report", {gemini:geminiFailure,openai:backupFailure});
+    const messages: Record<string,string> = {
+      "not-configured": "Le fournisseur OpenAI de secours n'est pas configuré.",
+      "unauthorized": "L'accès API OpenAI a été refusé. Vérifie les autorisations de la clé.",
+      "credits": "Le compte API OpenAI ne dispose pas des crédits nécessaires.",
+      "rate-limited": "OpenAI limite momentanément les appels au service.",
+      "timeout": "Les fournisseurs IA ont dépassé leur délai de réponse.",
+      "invalid": "La configuration OpenAI a été rejetée.",
+      "invalid-report": "Les fournisseurs IA n'ont pas renvoyé de rapport complet et exploitable.",
+      "unavailable": "Les fournisseurs IA sont temporairement indisponibles.",
+    };
+    return NextResponse.json({
+      error: (messages[backupFailure] || "L'analyse n'a pas abouti.") +
+        (internalTest ? " Cette tentative est comptabilisée dans le quota de tests interne." :
+          " Ton analyse gratuite n'a pas été décomptée."),
+    },{status:502,headers:{"Cache-Control":"no-store"}});
   }
+
+  const result:ScanResult = normalize(parsedReport);
 
   // Une analyse n'est marquée utilisée qu'après un rapport valide.
   // Une réservation non finalisée expire après 180 s, ce qui évite de bloquer
