@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ScanReport from "../ScanReport";
+import QualityDashboard from "./QualityDashboard";
 import "./test.css";
 import type { ScanResult } from "@/lib/scanPrompt";
 import { TEST_CASES } from "@/lib/testCases";
@@ -93,6 +94,7 @@ export default function InternalTestPage() {
      const data=await res.json().catch(()=>null);
      if(!res.ok)throw Error(data?.error||"Enregistrement impossible.");
      setMessage("Grille enregistrée sans CV, sans offre et sans rapport nominatif.");
+     setDashboardRevision(n=>n+1);
    }catch(err){setError(err instanceof Error?err.message:"Enregistrement impossible.");}
    finally{setSaving(false);}
  }
@@ -119,6 +121,7 @@ export default function InternalTestPage() {
        <div className="team-top-actions"><span>{quota ? `${quota.used} / ${quota.limit} tentatives ce mois` : "Quota non disponible"}</span>
        <button onClick={logout} className="team-secondary">Se déconnecter</button></div>
      </section>
+     <QualityDashboard revision={dashboardRevision}/>
      <section className="team-panel">
        <h2>1. Choisir un scénario fictif</h2>
        <div className="team-cases">
